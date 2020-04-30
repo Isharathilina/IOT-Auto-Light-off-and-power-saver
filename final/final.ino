@@ -1,13 +1,36 @@
+/*
+
+switch pin 23, internal pull up, set ground
+LDR A0 - pin VP, 3.3v 10k, 
+
+*/
+
+#include <WiFi.h>
+#include <PubSubClient.h>
+ 
+const char* ssid = "Fed Geek"; // Enter your WiFi name
+const char* password =  "11112222"; // Enter WiFi password
+const char* mqttServer = "soldier.cloudmqtt.com";
+const int mqttPort = 12729;
+const char* mqttUser = "ciyajbsc";
+const char* mqttPassword = "je1T5MADj3Wi";
+
+WiFiClient espClient;
+PubSubClient client(espClient);
 
 
 int pushButton = 23; //bulb on button pull up
 int bulbPin = 2;
-int bulbOnTime = 10;
+int bulbOnTime = 10; // on duration in second
 int boundVal=50;  // for ldr
 #define ldrPin A0
 
+// sending data
+String bState;
+String bDuration;
 
-int initLdrVal=0;
+
+int initLdrVal=0; 
 volatile int interruptCounter;
 int totalTimeCounter;
 
@@ -32,8 +55,29 @@ void IRAM_ATTR onTimer()
   portEXIT_CRITICAL_ISR(&timerMux);
  
 }
+
+
+ // mqtt server callback
+void callback(char* topic, byte* payload, unsigned int length) 
+{
  
-void setup() {
+  Serial.print("Message arrived in topic: ");
+  Serial.println(topic);
+ 
+  Serial.print("Message:");
+  for (int i = 0; i < length; i++) 
+  {
+    Serial.print((char)payload[i]);
+  }
+ 
+  Serial.println();
+  Serial.println("-----------------------");
+ 
+}
+ 
+ 
+void setup() 
+{
  
   Serial.begin(9600);
  
@@ -45,20 +89,56 @@ void setup() {
   pinMode(pushButton, INPUT_PULLUP); // for switch
   pinMode(bulbPin, OUTPUT); // for bulb
  
+  // wifi setup
+  WiFi.begin(ssid, password);
+ 
+  if (WiFi.status() != WL_CONNECTED) 
+  {
+    delay(100);
+    Serial.println("Connecting to WiFi..");
+  }
+  Serial.println("Connected to the WiFi network");
+ 
+  client.setServer(mqttServer, mqttPort);
+  client.setCallback(callback);
+ 
+ 
 }
  
-void loop() {
+void loop() 
+{
+
+	// try to connect server
+	if (!client.connected()) 
+	{
+		Serial.println("Connecting to MQTT...");
+		if(client.connect("ESP8266Client", mqttUser, mqttPassword )) 
+		{
+			Serial.println("connected");  
+		} else
+		{
+			Serial.print("failed with state ");
+			Serial.print(client.state());
+			delay(500);
+ 
+		}
+  }
+
+
  
  
   int buttonState = digitalRead(pushButton);
+  // when press on switch
   if(!buttonState)
   {
 	totalTimeCounter=0;
 	digitalWrite(bulbPin, HIGH);
 	delay(500);
-	initLdrVal = getLdrValue();
+	initLdrVal = getLdrValue(); // get sensor values
 	Serial.print("Bulb on Init LDR value :- ");
 	Serial.println(initLdrVal);
+	
+	bState = "On";
   
   }
   
@@ -66,6 +146,7 @@ void loop() {
   if(totalTimeCounter> bulbOnTime)
   {
 	digitalWrite(bulbPin, LOW);
+	bState = "Off";
   
   }
   
@@ -85,9 +166,12 @@ void loop() {
   }
   
   
+  // data send
+  client.loop();
+  client.publish("HomeData", "hello"); //Topic name
+  delay(500);
   
-  
- 
+ // timer
   if (interruptCounter > 0) 
   {
  
