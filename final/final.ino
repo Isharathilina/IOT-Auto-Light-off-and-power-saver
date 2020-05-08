@@ -7,6 +7,7 @@ LDR A0 - pin VP, 3.3v 10k,
 
 #include <WiFi.h>
 #include <PubSubClient.h>
+
  
 const char* ssid = "Fed Geek"; // Enter your WiFi name
 const char* password =  "11112222"; // Enter WiFi password
@@ -26,11 +27,11 @@ int boundVal=50;  // for ldr
 #define ldrPin A0
 
 // sending data
-String bState;
+String bState = "off";
 String bDuration;
 
 
-int initLdrVal=0; 
+int initLdrVal=0; // ldr value 
 volatile int interruptCounter;
 int totalTimeCounter;
 
@@ -78,7 +79,7 @@ void callback(char* topic, byte* payload, unsigned int length)
  
 void setup() 
 {
- 
+  initLdrVal = getLdrValue(); // get sensor values
   Serial.begin(9600);
  
   timer = timerBegin(0, 80, true);  // timer, prescaller, count up
@@ -108,20 +109,20 @@ void setup()
 void loop() 
 {
 
-	// try to connect server
-	if (!client.connected()) 
-	{
-		Serial.println("Connecting to MQTT...");
-		if(client.connect("ESP8266Client", mqttUser, mqttPassword )) 
-		{
-			Serial.println("connected");  
-		} else
-		{
-			Serial.print("failed with state ");
-			Serial.print(client.state());
-			delay(500);
+  // try to connect server
+  if (!client.connected()) 
+  {
+    Serial.println("Connecting to MQTT...");
+    if(client.connect("ESP8266Client", mqttUser, mqttPassword )) 
+    {
+      Serial.println("connected");  
+    } else
+    {
+      Serial.print("failed with state ");
+      Serial.print(client.state());
+      delay(500);
  
-		}
+    }
   }
 
 
@@ -131,22 +132,23 @@ void loop()
   // when press on switch
   if(!buttonState)
   {
-	totalTimeCounter=0;
-	digitalWrite(bulbPin, HIGH);
-	delay(500);
-	initLdrVal = getLdrValue(); // get sensor values
-	Serial.print("Bulb on Init LDR value :- ");
-	Serial.println(initLdrVal);
-	
-	bState = "On";
+  totalTimeCounter=0;
+  digitalWrite(bulbPin, HIGH);
+  delay(500);
+  initLdrVal = getLdrValue(); // get sensor values
+  Serial.print("Bulb on Init LDR value :- ");
+  Serial.println(initLdrVal);
+  
+  bState = "On";
+  
   
   }
   
   
   if(totalTimeCounter> bulbOnTime)
   {
-	digitalWrite(bulbPin, LOW);
-	bState = "Off";
+  digitalWrite(bulbPin, LOW);
+  bState = "Off";
   
   }
   
@@ -162,13 +164,20 @@ void loop()
   {
     Serial.print("Human activity detected, LDR val :- ");
     Serial.println(checkVal);
-	totalTimeCounter=0; // zero counter
+    totalTimeCounter=0; // zero counter
+    initLdrVal = getLdrValue(); // get sensor values
+    bDuration ="Reset";
   }
   
   
   // data send
+  //bDuration = String(totalTimeCounter);
+  String sendigData = "Bulb:- " + bState+ "  " + "Duration:- " + bDuration;
+  char finalData[32];
+  sendigData.toCharArray(finalData, 32);
+  
   client.loop();
-  client.publish("HomeData", "hello"); //Topic name
+  client.publish("HomeData", finalData); //Topic name finalData
   delay(500);
   
  // timer
@@ -180,6 +189,7 @@ void loop()
     portEXIT_CRITICAL(&timerMux);
  
     totalTimeCounter++;
+	bDuration = String(totalTimeCounter);
  
     Serial.print("Timer Count : ");
     Serial.println(totalTimeCounter);
