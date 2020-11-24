@@ -6,6 +6,5 @@
 * MQTT
 
 # Peoject Discription
-This project for autocratically off home lights when not detect human activities. </br>
-Human activities detect by Using LDRs </br>
-It also can monitor current situation using cloud MQTT web socket 
+This project is automatically off home lights form not detect human activities. </br>
+It also can monitor the current situation using cloud MQTT web socket 
